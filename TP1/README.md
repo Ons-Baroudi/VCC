@@ -22,9 +22,9 @@ Une machine virtuelle (VM) est une représentation logicielle d'une machine phys
 
 **3. Différence entre travailler sur son ordinateur et dans une VM**
 
-- La VM a des ressources limitées et un surcoût : elle n'a que ce qu'on lui alloue (1 CPU, 2048 Mo), et son OS consomme déjà 97 processus et 311 Mo de RAM sans aucune application.
+- La VM a des ressources limitées mais  un surcoût aussi. En effet,  elle n'a que ce qu'on lui alloue (1 CPU, 2048 Mo), mais  son OS consomme déjà 97 processus et 311 Mo de RAM sans aucune application.
 - La VM est isolée grâce à son réseau privé, séparé de l'extérieur. En NAT, elle a une adresse privée (10.0.2.15) injoignable depuis notre PC : il a fallu une redirection de port pour s'y connecter en SSH (port 5555 de notre machine physique vers le port 22 de la VM).
-- La VM est séparée de la machine hôte : si elle tombe en panne, la machine hôte n'est pas affectée. En revanche, si la machine hôte tombe en panne, toutes ses VM s'arrêtent.
+- Etant donnée que la vm est séparée de la machine hôte, si elle tombe en panne, la machine hôte n'est pas affectée. En revanche, si la machine hôte tombe en panne, toutes ses VM s'arrêtent.
   
 ## Étape 2 : Conteneurs
 Dans cet etape, nous avons installé Docker dans la vm depuis le dépôt officiel. 
@@ -39,10 +39,37 @@ Aussi, il a une interface (observé lors du tp) eth0 et son IP est 172.17.0.2. E
 - Une VM  embarque son propre OS complet, avec son noyau, au-dessus d'un hyperviseur ( et rend son materiel physique virtuel).
 - Or, les conteneurs partagent le kernel de l'os hote et n'embarquent que l'application et ses bibliothèques, au-dessus d'un container.
 c'est pour ça , on a observé lors du tp que   l'image ubuntu fait 45,6 Mo (car elle ne contient pas de noyau), contre 25 Gio de disque pour la VM
-- Aussi,puisqu'il s'exécute directement sur le kernel,  le conteneur démarre instantanément alors que la VM doit démarrer un OS de 97 processus (elle doit passer l'hypervisuer , et l'hyperviseur doit demander au kernel hote, pour qu'elle puisse finalement démarrer).
+- Aussi,puisqu'il s'exécute directement sur le kernel,  le conteneur démarre instantanément alors que la VM doit démarrer un OS de 97 processus (elle doit passer l'hypervisuer , et l'hyperviseur doit demander au kernel hôte, pour qu'elle puisse finalement démarrer).
   
 **3. Pourquoi les conteneurs sont-ils adaptés au déploiement dans le Cloud ?**
-Comme on l'a vu au tp, le conteneur est lèger (45 mo) car  n'embarque ni OS ni kernel, seulement l'application et ses bibliothèques. Il se télécharge et démarre donc en quelques secondes. et c'est grâce à cette légèreté, on peut multiplier les conteneurs d'une application quand la charge augmente et les supprimer quand elle baisse. C'est l'élasticité du Cloud .
+Comme on l'a vu au tp, le conteneur est lèger (45 mo) car  n'embarque ni OS ni kernel, seulement l'application et ses bibliothèques. Il se télécharge et démarre donc en quelques secondes. et c'est grâce à cette légèreté, on peut multiplier les conteneurs d'une application quand la charge augmente et les supprimer quand elle baisse.
 
+## Étape 3 Docker
+### Checkpoint
+**1. Pourquoi un Dockerfile est-il préférable à la configuration manuelle d'un conteneur ?**
 
+On a Configuré à la main dans `cnt1` : `apt update`, puis installation de `net-tools` et `ping`. Ces paquets n'existent que dans ce conteneur. Pour 50 ou 100 conteneurs, il faudrait refaire toutes ces étapes sur chacun : c'est long, pénible et chaque répétition risque une erreur ou un oubli.
 
+Mais avec  Dockerfile, cette configuration devient automatique et rapide car on décrit une seule fois les étapes; image de base, code, dépendances, port, commande ( et c'est un processus très long) , `docker build` produit une image, et chaque conteneur créé à partir d'elle est configuré à l'identique. Pour une mise à jour, on modifie une ligne du Dockerfile et on reconstruit, au lieu de reconfigurer chaque conteneur.
+
+**2. Quelle différence existe entre une image Docker et un conteneur Docker ?**
+l'image docker est exécuté dans le conteneur. L'image est le modèle qui englobe l'application, ses dépendances et sa configuration (ici `hello-api:1.0`, 198 Mo, construite à partir du Dockerfile).
+
+Alors que le conteneur est l'instance qui exécute cette image, avec son propre processus, rzo. Le conteneur hello-api qu'on a crée tourne avec l'adresse ip 172.17.0.3. Lors de l'execution de l'image, le conteneur crée une interface passerelle , et l'adresse de cette interface ets la même du conteneur (donc dans notre cas 172.17.0.3).
+
+ Une image donne autant de conteneurs qu'on veut, et modifier un conteneur ne modifie pas l'image(image= modèle immuable).
+
+ ## 4) Déployer une application multi-conteneurs
+ ### Checkpoint
+ Le dossier `calculator` contient 5 microservices (calc, sum, sub, mul, div), donc 5 Dockerfiles. `docker compose build` a construit les 5 images, puis `docker compose up` a créé le réseau `calculator_default` et lancé les 5 conteneurs, chacun sur son port (addition 50001, soustraction 50002, multiplication 50003, division 50004, calculator 80).
+ - Le port 80 n'est pas joignable depuis la VM
+**1. Pourquoi Docker Compose est-il préférable au lancement manuel de plusieurs conteneurs ?**
+   À la main, il aurait fallu enchaîner 5 `docker build`, créer un réseau, 5 `docker run` avec les bons noms et ports, puis tout arrêter un par un. C'est l'enchaînement à risque et long (on peut produire des erreurs,oubli d'une étape, erreur de configuration).
+   Avec Compose, une commande construit les 5 images, une autre crée le réseau et lance l'application, une dernière supprime tout.
+   
+**2. Quel est le rôle du fichier docker-compose.yml ?**
+Il décrit toute l'application dans un seul fichier : les 5 services de la calculatrice(sum,sub,mult,div et calculatrice), le Dockerfile de chacun et les ports publiés (seul `calculator` expose 50000:80, les autres restent sur le réseau interne)
+
+**3. Dans quels cas Docker Compose pourrait-il atteindre ses limites ?**
+
+ompose déploie tout sur un seul hôte : le réseau qu'il a créé a d'ailleurs une portée locale.Il n'existe que sur notre VM. Si cette VM tombe, les 5 services tombent. Aussi, Compose ne sait pas répartir les services sur plusieurs VM ou plusieurs Clouds. 
