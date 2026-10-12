@@ -63,6 +63,7 @@ Alors que le conteneur est l'instance qui exécute cette image, avec son propre 
  ### Checkpoint
  Le dossier `calculator` contient 5 microservices (calc, sum, sub, mul, div), donc 5 Dockerfiles. `docker compose build` a construit les 5 images, puis `docker compose up` a créé le réseau `calculator_default` et lancé les 5 conteneurs, chacun sur son port (addition 50001, soustraction 50002, multiplication 50003, division 50004, calculator 80).
  - Le port 80 n'est pas joignable depuis la VM
+   
 **1. Pourquoi Docker Compose est-il préférable au lancement manuel de plusieurs conteneurs ?**
    À la main, il aurait fallu enchaîner 5 `docker build`, créer un réseau, 5 `docker run` avec les bons noms et ports, puis tout arrêter un par un. C'est l'enchaînement à risque et long (on peut produire des erreurs,oubli d'une étape, erreur de configuration).
    Avec Compose, une commande construit les 5 images, une autre crée le réseau et lance l'application, une dernière supprime tout.
@@ -72,4 +73,4 @@ Il décrit toute l'application dans un seul fichier : les 5 services de la calcu
 
 **3. Dans quels cas Docker Compose pourrait-il atteindre ses limites ?**
 
-ompose déploie tout sur un seul hôte : le réseau qu'il a créé a d'ailleurs une portée locale.Il n'existe que sur notre VM. Si cette VM tombe, les 5 services tombent. Aussi, Compose ne sait pas répartir les services sur plusieurs VM ou plusieurs Clouds. 
+Compose déploie tout sur un seul hôte : le réseau qu'il a créé a d'ailleurs une portée locale.Il n'existe que sur notre VM. Si cette VM tombe, les 5 services tombent. Aussi, Compose ne sait pas répartir les services sur plusieurs VM ou plusieurs Clouds. 
