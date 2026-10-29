@@ -1,8 +1,12 @@
-### Binôme : Ons BAROUDI et Nawfel ELHammadi
+# TP3 : Déployer une application distribuée
+
+**Binôme : Ons BAROUDI et Nawfel ELHammadi**
+
+## Étape 1
+
+![Architecture](architecture-tp3.png)
 
 ## Étape 2
-
-On a créé les 5 VM en ligne de commande (`vm-calc`, `vm-add`, `vm-sub`, `vm-mul`, `vm-div`), toutes en `insa-tiny` sur le réseau `net-discovery`, et on a associé l'IP flottante 194.199.106.216 à `vm-calc`. Pour se connecter aux autres VM, qui n'ont pas d'IP publique, on passe par `vm-calc` grâce au `ProxyJump` dans le fichier `config`. Ensuite, sur chaque VM, on a installé Docker, cloné le dépôt, construit l'image du service et lancé un seul conteneur en publiant son port. Pour `calculator`, on a ajouté des `--add-host`, parce que le code appelle les services par leur nom (`addition`, `substraction`...) et que, sans Docker Compose, plus personne ne fait la traduction entre ces noms et les adresses des VM.
 
 **1. Quels sont les différents rôles de la VM connectée à Internet dans votre architecture ?**
 
@@ -13,10 +17,6 @@ En gros, `vm-calc` joue trois rôles. D'abord, c'est la porte d'entrée de l'app
 Le premier avantage, c'est que les pannes restent isolées : si une VM tombe, seul son service est touché, alors qu'au TP1 tout tombait en même temps parce que les 5 conteneurs étaient sur la même machine. Chaque service a aussi ses propres ressources, donc si un service est très sollicité, il ne ralentit pas les autres. On peut également agrandir, redémarrer ou mettre à jour une VM sans toucher au reste de l'application. Et c'est plus sûr, puisque seule `vm-calc` est exposée à Internet, les services de calcul restent cachés dans le réseau privé.
 
 ## Étape 3
-
-En lisant le code, on a vu que tous les services communiquent en HTTP (donc en TCP) : `calculator` écoute sur le port 80 dans son conteneur, et appelle les autres services avec des requêtes POST sur les ports 50001 à 50004. On a donc ajouté deux règles au groupe de sécurité : une pour l'accès des utilisateurs depuis Internet, et une pour les ports 50001 à 50004, limitée au groupe `sec-grp-tp2` pour que seules nos VM puissent les utiliser. On a aussi supprimé la règle du port 5000 qui servait au TP2.
-
-On a testé progressivement : d'abord le ping entre les VM, puis chaque service en local, puis chaque service depuis `vm-calc` par le réseau privé, et enfin l'application complète depuis notre PC. Au début, le port 50000 ne passait pas depuis notre PC alors que SSH et ping marchaient. Comme les tests depuis `vm-calc` et depuis `vm-add` fonctionnaient, on en a déduit que c'était le VPN de l'INSA qui filtrait ce port, et on a publié `calculator` sur le port 5000 à la place. Depuis notre PC, `curl -X POST -d "2+3*4" http://194.199.106.216:5000` renvoie bien `result = 14`.
 
 **1. Quels flux réseau sont nécessaires au fonctionnement de votre application ?**
 
