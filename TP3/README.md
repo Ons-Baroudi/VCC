@@ -1,7 +1,5 @@
 ### Binôme : Ons BAROUDI et Nawfel ELHammadi
 
-## checkpoint  etape 2
-
 ## Étape 2
 
 On a créé les 5 VM en ligne de commande (`vm-calc`, `vm-add`, `vm-sub`, `vm-mul`, `vm-div`), toutes en `insa-tiny` sur le réseau `net-discovery`, et on a associé l'IP flottante 194.199.106.216 à `vm-calc`. Pour se connecter aux autres VM, qui n'ont pas d'IP publique, on passe par `vm-calc` grâce au `ProxyJump` dans le fichier `config`. Ensuite, sur chaque VM, on a installé Docker, cloné le dépôt, construit l'image du service et lancé un seul conteneur en publiant son port. Pour `calculator`, on a ajouté des `--add-host`, parce que le code appelle les services par leur nom (`addition`, `substraction`...) et que, sans Docker Compose, plus personne ne fait la traduction entre ces noms et les adresses des VM.
