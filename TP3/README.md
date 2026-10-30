@@ -4,7 +4,7 @@
 
 ## Étape 1
 
-![Architecture](architecture-tp3.png)
+https://github.com/Ons-Baroudi/VCC/blob/main/TP3/architecture-tp3.drawio.png  
 
 ## Étape 2
 
