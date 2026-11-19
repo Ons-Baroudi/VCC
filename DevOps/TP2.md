@@ -52,3 +52,34 @@ Le job a réalisé les étapes suivantes.
 **5. Fin du build**
 - `First time build. Skipping changelog.` : pour un premier build, il n'y a pas de build précédent auquel comparer, donc pas de liste de modifications.
 - `Finished: SUCCESS` : toutes les étapes ont réussi.
+
+## Étape 2
+
+**1. Quelles opérations réalisées manuellement dans le TP1 ont été automatisées par Jenkins ?**
+
+Dans le TP1, pour mettre la calculatrice en ligne, on a fait à la main :
+1. le clonage du code (`git clone`) ;
+2. la construction des images des 5 microservices (`docker build` dans chaque dossier : calc, sum, sub, mul, div) ;
+3. le tag et l'envoi des images vers le Registry (`docker tag` + `docker push`) ;
+4. le déploiement sur le cluster (`kubectl apply` des manifestes).
+
+Avec Jenkins, le pipeline décrit dans le Jenkinsfile fait automatiquement :
+- **le clonage du dépôt GitHub** : stage `Declarative: Checkout SCM`, ajouté automatiquement par Jenkins en mode « Pipeline script from SCM » ;
+- **la construction des 5 images Docker** : stages `Build calc-service` à `Build div-service`, qui exécutent `docker build -t calculator-<service>:latest .` dans chaque dossier.
+
+**Le lancement est aussi automatisé** : grâce à la scrutation du dépôt (`H/5 * * * *`), Jenkins vérifie toutes les 5 minutes s'il y a un nouveau commit sur `main` et lance le build tout seul. Le build #2 a démarré à la suite de notre commit sur le README (`2ec0cb4`), sans aucun clic.
+
+L'installation et la configuration de l'infrastructure (cluster Kubernetes, Registry, containerd) restent manuelles : Jenkins ne fait que s'en servir.
+**2. Votre pipeline comporte plusieurs étapes. Que se passe-t-il si la construction de l'image calculator-sub échoue ?**
+
+Si la commande `docker build` du stage `Build sub-service` échoue, elle renvoie un code de sortie différent de 0 et Jenkins considère l'étape comme échouée. Le pipeline s'arrête immédiatement :
+- les stages suivants (`Build mul-service` et `Build div-service`) ne sont pas exécutés = echec de pipeline.
+- 
+**3. Le Webhook GitHub est la méthode la plus utilisée en entreprise dans une chaîne CI. Quelles opérations devriez-vous faire pour la mettre en place dans votre architecture ?**
+
+Avec le polling actuel, c'est Jenkins qui interroge GitHub toutes les 5 minutes pour savoir s'il y a un nouveau commit. Avec un webhook, c'est l'inverse : dès qu'un push est fait sur le dépôt, GitHub envoie une requête HTTP à Jenkins pour lui dire de lancer le pipeline. Le build démarre immédiatement, sans délai et sans requêtes inutiles.
+
+Il faut donc que GitHub puisse joindre Jenkins depuis Internet. Or, dans notre architecture, VM-Jenkins n'a qu'une adresse privée (`192.168.20.73`) et n'est accessible que via un rebond SSH par VM-K8s. Les opérations à faire sont :
+
+1. **Rendre Jenkins joignable** : associer une IP flottante à VM-Jenkins dans OpenStack et ouvrir le port 8080 dans son groupe de sécurité.
+2. **Configurer le webhook sur GitHub** : dans le dépôt Calculator-CICD
