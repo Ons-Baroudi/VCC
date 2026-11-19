@@ -83,3 +83,39 @@ Il faut donc que GitHub puisse joindre Jenkins depuis Internet. Or, dans notre a
 
 1. **Rendre Jenkins joignable** : associer une IP flottante à VM-Jenkins dans OpenStack et ouvrir le port 8080 dans son groupe de sécurité.
 2. **Configurer le webhook sur GitHub** : dans le dépôt Calculator-CICD
+
+## Étape 3
+
+**1. Pourquoi Jenkins doit-il disposer d'un accès à l'API Kubernetes ?**
+
+Jenkins est un orchestrateur de la chaîne CI/CD : il ne remplace ni Docker ni Kubernetes, il les pilote. Pour automatiser la dernière étape, le déploiement des microservices de la calculatrice, il doit pouvoir exécuter `kubectl apply` sur les manifestes du dossier `kubernetes/`.
+
+Or `kubectl` ne fait qu'envoyer des requêtes à l'API server, qui est le seul point d'entrée du cluster : c'est lui qui enregistre l'état désiré (dans etcd), puis le scheduler et les controllers créent ou mettent à jour les pods. Sans accès à l'API, le déploiement resterait manuel (`kubectl apply` tapé sur VM-K8s, comme au TP1).
+
+**2. Quelles étapes du job Jenkins correspondent à la CI, et lesquelles correspondent à la CD ?**
+
+**CI (intégration continue)** : à chaque commit, le code est récupéré et construit automatiquement, pour vérifier qu'il s'intègre sans casser le build.
+- le clonage du dépôt GitHub : stage `Declarative: Checkout SCM`, ajouté automatiquement par Jenkins en mode « Pipeline script from SCM » (ainsi que le stage `Checkout`, qui n'est qu'un `echo`) ;
+- la construction des 5 images Docker : stages `Build calc-service` à `Build div-service`, qui exécutent `docker build -t 192.168.20.134:5000/calculator-<service>:2.0 .` dans chaque dossier.
+
+**CD**, en deux niveaux :
+- **Continuous Delivery (livraison continue)** : stage `Push images`. Les images versionnées sont publiées dans le Registry (`docker push`) : la nouvelle version est livrée et prête à être déployée sur le cluster.
+- **Continuous Deployment (déploiement continu)** : stage `Deploy to Kubernetes`. Les manifestes du dossier `kubernetes/` sont appliqués sur le cluster (`kubectl apply`) : la nouvelle version est mise en service automatiquement, sans intervention humaine.
+
+
+**3. Quel est le parcours d'une modification du code source depuis le "git push" jusqu'à l'application Calculator ?**
+
+1. Le développeur pousse sa modification sur `main` (**Git**, **GitHub**).
+2. Jenkins détecte le nouveau commit grâce au polling toutes les 5 minutes (**Jenkins**).
+3. Jenkins lit le Jenkinsfile et clone le dépôt (**Jenkins**, **Git**).
+4. Les 5 images sont construites (**Docker**, `docker build`).
+5. Les images sont publiées dans le Registry `192.168.20.134:5000` (**Docker**, `docker push`, **Registry**).
+6. Les manifestes sont appliqués sur le cluster (**kubectl**, **API Kubernetes**, avec le kubeconfig et les droits RBAC).
+7. Kubernetes remplace les anciens pods par les nouveaux, par rolling update (**Kubernetes** : scheduler, controllers).
+8. Les nœuds téléchargent l'image et lancent les conteneurs (**kubelet**, **containerd**).
+9. Les Services relient les microservices entre eux et exposent calc (**Services**, **CoreDNS**, **Calico**).
+10. L'utilisateur interroge la calculatrice sur le NodePort `32333` (`curl`).
+
+Jenkins automatise les étapes 2 à 6, Kubernetes réalise les étapes 7 à 10.
+
+**Limite :** la version `2.0` est fixe. Pour un nouveau commit, les manifestes ne changent pas, donc `kubectl apply` ne redéploie rien. Il faudrait une version unique par build (numéro de build ou hash du commit).
